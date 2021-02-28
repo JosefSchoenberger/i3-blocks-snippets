@@ -17,12 +17,13 @@
 
 CC=gcc
 WFLAGS=-Wall -Wextra -Wpedantic
+IFLAGS=-iquote $(CURDIR)
 OFLAGS=-O3
 DIR=./build
 
 .PHONY: all
 all: | dir par
-par: log.out color.out cpu_usage
+par: log.out color.out cpu_usage.out
 
 .PHONY: debug
 debug: all
@@ -32,17 +33,17 @@ debug: OFLAGS+=-O0 -g -DDEBUG
 dir: 
 	mkdir -p $(DIR)/
 
-log.out: log.c log.h
-	$(CC) $(WFLAGS) $(OFLAGS) -o $(DIR)/$@ log.c -c
+log.out: util/log.c util/log.h
+	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $(DIR)/$@ util/log.c -c
 
-color.out: color.c color.h
-	$(CC) $(WFLAGS) $(OFLAGS) -o $(DIR)/$@ color.c -c
+color.out: util/color.c util/color.h
+	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $(DIR)/$@ util/color.c -c
 
-cpu_usage: color.out log.out cpu_usage.c
-	$(CC) $(WFLAGS) $(OFLAGS) -o $@ cpu_usage.c $(DIR)/log.out $(DIR)/color.out
+cpu_usage.out: $(DIR)/color.out $(DIR)/log.out cpu_usage/cpu_usage.c cpu_usage/temp.c
+	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ cpu_usage/cpu_usage.c cpu_usage/temp.c $(DIR)/log.out $(DIR)/color.out -lsensors
 
 .PHONY: clean
 .SILENT: clean
 clean:
 	rm -rf build
-	rm -f cpu_usage
+	rm -f cpu_usage.out

@@ -32,8 +32,10 @@
 #include <proto/error.h>
 #endif
 
-#include "log.h"
-#include "color.h"
+#include "util/log.h"
+#include "util/color.h"
+
+#include "temp.h"
 
 #define LOG_PROG_NAME "\033[33mCPU Usage\033[0m: "
 #define IN_BUFFER_SIZE 8
@@ -92,11 +94,14 @@ int init(struct state* state) {
 	state->termLength = 0;
 
 	if(!(state->freq = fopen("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", "r"))) {
-		appendLog(LOG_ERROR, logFile, LOG_PROG_NAME "Could not open freqency file\n\t\tDisabling the frequency feature.");
+		appendLog(LOG_ERROR, logFile, LOG_PROG_NAME "Could not open freqency file\n"
+				"\t\tDisabling the frequency feature.");
 		state->freq = NULL;
 	}
 	if(state->freq && setvbuf(state->freq, NULL, _IONBF, 0)) {
-		appendLog(LOG_ERROR, logFile, LOG_PROG_NAME "Could not disable buffer for /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq.\n\t\tDisabling the frequency feature.");
+		appendLog(LOG_ERROR, logFile, LOG_PROG_NAME
+				"Could not disable buffer for /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq.\n"
+				"\t\tDisabling the frequency feature.");
 		fclose(state->freq);
 		state->freq = NULL;
 	}
@@ -115,8 +120,17 @@ void printUsage(struct state* state) {
 }
 
 void printTemp(struct state* state) {
-	// TODO FIXME implement
-	printUsage(state);
+	double temp = getCPUTemp(logFile, LOG_PROG_NAME);
+
+	if (temp == -1) {
+		printUsage(state);
+		return;
+	} else if (recalculateLastCPU(state) == -1) {
+		exit(EXIT_FAILURE);
+	}
+
+	printf("{\"name\":\"CPU\", \"full_text\":\"CPU:%3.0f °C\", \"short_text\":\"CPU%3.0f°\", \"color\":\"%s\"}\n",
+			temp, temp, color(temp, 87, 84, 78));
 }
 
 int error_rep_count = 0;
@@ -136,7 +150,8 @@ void printFreq(struct state* state) {
 		if (error_rep_count >= 5) {
 			fclose(state->freq);
 			state->freq = 0;
-			appendLog(LOG_ERROR, logFile, LOG_PROG_NAME "Could not read/parse freqency file 5 times in a row. Disabling frequency feature.");
+			appendLog(LOG_ERROR, logFile, LOG_PROG_NAME
+					"Could not read/parse freqency file 5 times in a row. Disabling frequency feature.");
 		}
 		error_rep_count ++;
 		return;
@@ -182,6 +197,7 @@ int main() {
 		sigaction(SIGINT, &act, NULL);
 	}
 
+	initColor(logFile, LOG_PROG_NAME);
 
 	int stdinno = fileno(stdin);
 	fd_set set;
@@ -197,7 +213,8 @@ int main() {
 			timeout.tv_sec = parsed;
 			timeout.tv_nsec = (parsed - timeout.tv_sec) * 1e9;
 			if (timeout.tv_sec == 0 && timeout.tv_nsec < 1e8) {
-				appendLogf(LOG_WARN, logFile, LOG_PROG_NAME "Specified time is too small: %lf", timeout.tv_sec + timeout.tv_nsec * 1e-9);
+				appendLogf(LOG_WARN, logFile, LOG_PROG_NAME "Specified time is too small: %lf",
+						timeout.tv_sec + timeout.tv_nsec * 1e-9);
 				timeout.tv_sec = 1;
 				timeout.tv_nsec = 0;
 			}
@@ -210,7 +227,7 @@ int main() {
 	if(init(&state) == EXIT_FAILURE)
 		return EXIT_FAILURE;
 
-	initColor(logFile, LOG_PROG_NAME);
+	initTemp(logFile, LOG_PROG_NAME);
 
 	int countdown=0;
 	int type = 1;
@@ -225,9 +242,8 @@ int main() {
 				appendLog(LOG_FATAL, logFile, LOG_PROG_NAME "Out of memory");
 				return EXIT_FAILURE;
 			} else {
-				char buff[1024];
-				snprintf(buff, 1024, LOG_PROG_NAME "Could not select, %s", strerror(errno));
-				appendLog(LOG_FATAL, logFile, buff);
+				appendLogf(LOG_FATAL, logFile, LOG_PROG_NAME "Could not select, %s",
+						strerror(errno));
 				return EXIT_FAILURE;
 			}
 			continue;
@@ -235,7 +251,7 @@ int main() {
 		if (val != 0) { // not caused by timeout
 			char c = fgetc(stdin);
 			if (c == EOF) {
-				appendLog(LOG_FATAL, logFile, LOG_PROG_NAME "Recievend EOF; Terminating.");
+				appendLog(LOG_FATAL, logFile, LOG_PROG_NAME "Recieved EOF; Terminating.");
 				break;
 			}
 			if(!isdigit(c))
@@ -275,9 +291,11 @@ int main() {
 				printFreq(&state);
 				break;
 		}
+		fflush(stdout);
 	}
 	fclose(logFile);
 	fclose(state.freq);
 	fclose(state.stat);
+	destructTemp();
 	return EXIT_SUCCESS;
 }
