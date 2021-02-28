@@ -1,0 +1,1 @@
+{"":"","command":"$HOME/Dokumente/my-i3-blocks-snippets/cpu_usage.out","separator_block_width":"50 #20","name":"CPU","interval":"persist","format":"json","full_text":"CPU:  8.0%","short_text":"CPU  8%","color":"#FFFFFF","button":1,"event":272,"x":1435,"y":15,"relative_x":22,"relative_y":15,"width":80,"height":25,"scale":3}
