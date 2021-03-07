@@ -293,8 +293,8 @@ int main() {
 		}
 		fflush(stdout);
 	}
-	fclose(logFile);
-	fclose(state.freq);
+	if(logFile) fclose(logFile);
+	if(state.freq) fclose(state.freq);
 	fclose(state.stat);
 	destructTemp();
 	return EXIT_SUCCESS;
