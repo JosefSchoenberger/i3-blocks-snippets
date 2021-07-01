@@ -34,6 +34,7 @@
 
 #include "util/log.h"
 #include "util/color.h"
+#include "util/read_button.h"
 
 #include "temp.h"
 
@@ -249,21 +250,23 @@ int main() {
 			continue;
 		}
 		if (val != 0) { // not caused by timeout
-			char c = fgetc(stdin);
-			if (c == EOF) {
+			int button = get_button();
+			if (button < 0) {
+				appendLogf(errno != EPROTO ? LOG_FATAL : LOG_WARN, logFile, LOG_PROG_NAME "Error determining button: %s%s", strerror(errno), errno != EPROTO ? ". Terminating." : "");
+				if (errno != EPROTO)
+					break;
+			} else if (!button) {
 				appendLog(LOG_FATAL, logFile, LOG_PROG_NAME "Recieved EOF; Terminating.");
 				break;
 			}
-			if(!isdigit(c))
-				continue;
 #ifdef DEBUG
-			appendLogf(LOG_INFO, logFile, LOG_PROG_NAME "Got %c", c);
+			appendLogf(LOG_INFO, logFile, LOG_PROG_NAME "Button %d was pressed", button);
 #endif
-			switch(c) {
-				case '1':
-				case '3':
+			switch(button) {
+				case 1:
+				case 3:
 					countdown = countdown_set;
-					type = c - '0';
+					type = button;
 					break;
 				default:
 					countdown = 0;
@@ -297,5 +300,6 @@ int main() {
 	if(state.freq) fclose(state.freq);
 	fclose(state.stat);
 	destructTemp();
+	button_uninit();
 	return EXIT_SUCCESS;
 }

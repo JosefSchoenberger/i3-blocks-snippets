@@ -21,15 +21,15 @@ IFLAGS=-iquote $(CURDIR)
 OFLAGS=-O3
 DIR=./build
 
-.PHONY: all
+.PHONY:
 all: | dir par
-par: log.out color.out cpu_usage.out
+par: log.out color.out read_button.out cpu_usage.out
 
 .PHONY: debug
 debug: all
 debug: OFLAGS+=-O0 -g -DDEBUG
 
-.PHONY: all
+.PHONY:
 dir: 
 	mkdir -p $(DIR)/
 
@@ -39,8 +39,12 @@ log.out: util/log.c util/log.h
 color.out: util/color.c util/color.h
 	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $(DIR)/$@ util/color.c -c
 
+read_button.out: util/read_button.c util/read_button.h
+	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $(DIR)/$@ util/read_button.c -c
+
 cpu_usage.out: $(DIR)/color.out $(DIR)/log.out cpu_usage/cpu_usage.c cpu_usage/temp.c
-	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ cpu_usage/cpu_usage.c cpu_usage/temp.c $(DIR)/log.out $(DIR)/color.out -lsensors
+	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ cpu_usage/cpu_usage.c cpu_usage/temp.c $(DIR)/log.out $(DIR)/color.out \
+		$(DIR)/read_button.out -lsensors
 
 .PHONY: clean
 .SILENT: clean
