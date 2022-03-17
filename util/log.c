@@ -69,7 +69,7 @@ void appendLog(enum LOGLEVEL level, FILE* logfile, char* msg) {
 	flock(fileno(logfile), LOCK_UN);
 }
 
-void appendLogf(enum LOGLEVEL level, FILE* logfile, char* format, ...) {
+__attribute__((format(printf, 3, 4))) void appendLogf(enum LOGLEVEL level, FILE* logfile, char* format, ...) {
 	if(!logfile)
 		return;
 

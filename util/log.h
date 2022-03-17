@@ -27,4 +27,4 @@ enum LOGLEVEL {
 };
 
 void appendLog(enum LOGLEVEL level, FILE* logfile, char* msg);
-void appendLogf(enum LOGLEVEL level, FILE* logfile, char* format, ...);
+__attribute__((format(printf, 3, 4))) void appendLogf(enum LOGLEVEL level, FILE* logfile, char* format, ...);
