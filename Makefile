@@ -21,33 +21,27 @@ IFLAGS=-iquote $(CURDIR)
 OFLAGS ?= -O3
 DIR=./build
 
-.PHONY:
-all: | dir par
-par: cpu_usage.out
+.PHONY: all
+all: cpu_usage.out memory_usage.out
 
 .PHONY: debug
 debug: all
 debug: OFLAGS+=-O0 -g -DDEBUG
 
-.PHONY:
-dir: 
+.PHONY: all
+$(DIR):
 	mkdir -p $(DIR)/
 
-$(DIR)/log.out: util/log.c util/log.h
-	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ util/log.c -c
+$(DIR)/%.out: util/%.c util/%.h | $(DIR)
+	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ $< -c
 
-$(DIR)/color.out: util/color.c util/color.h
-	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ util/color.c -c
-
-$(DIR)/read_button.out: util/read_button.c util/read_button.h
-	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ util/read_button.c -c
-
-cpu_usage.out: $(DIR)/color.out $(DIR)/log.out cpu_usage/cpu_usage.c cpu_usage/temp.c $(DIR)/read_button.out
-	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ cpu_usage/cpu_usage.c cpu_usage/temp.c $(DIR)/log.out $(DIR)/color.out \
-		$(DIR)/read_button.out -lsensors
+cpu_usage.out: $(DIR)/color.out $(DIR)/log.out $(DIR)/input_parser.out cpu_usage/cpu_usage.c cpu_usage/temp.c
+	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ $^ -lsensors
+memory_usage.out: $(DIR)/color.out $(DIR)/log.out $(DIR)/input_parser.out memory_usage/memory_usage.c
+	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ $^
 
 .PHONY: clean
 .SILENT: clean
 clean:
 	rm -rf build
-	rm -f cpu_usage.out
+	rm -f cpu_usage.out memory_usage.out
