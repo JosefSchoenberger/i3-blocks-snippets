@@ -18,12 +18,12 @@
 CC=gcc
 WFLAGS=-Wall -Wextra -Wpedantic
 IFLAGS=-iquote $(CURDIR)
-OFLAGS=-O3
+OFLAGS ?= -O3
 DIR=./build
 
 .PHONY:
 all: | dir par
-par: log.out color.out read_button.out cpu_usage.out
+par: cpu_usage.out
 
 .PHONY: debug
 debug: all
@@ -33,16 +33,16 @@ debug: OFLAGS+=-O0 -g -DDEBUG
 dir: 
 	mkdir -p $(DIR)/
 
-log.out: util/log.c util/log.h
-	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $(DIR)/$@ util/log.c -c
+$(DIR)/log.out: util/log.c util/log.h
+	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ util/log.c -c
 
-color.out: util/color.c util/color.h
-	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $(DIR)/$@ util/color.c -c
+$(DIR)/color.out: util/color.c util/color.h
+	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ util/color.c -c
 
-read_button.out: util/read_button.c util/read_button.h
-	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $(DIR)/$@ util/read_button.c -c
+$(DIR)/read_button.out: util/read_button.c util/read_button.h
+	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ util/read_button.c -c
 
-cpu_usage.out: $(DIR)/color.out $(DIR)/log.out cpu_usage/cpu_usage.c cpu_usage/temp.c
+cpu_usage.out: $(DIR)/color.out $(DIR)/log.out cpu_usage/cpu_usage.c cpu_usage/temp.c $(DIR)/read_button.out
 	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ cpu_usage/cpu_usage.c cpu_usage/temp.c $(DIR)/log.out $(DIR)/color.out \
 		$(DIR)/read_button.out -lsensors
 
