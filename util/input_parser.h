@@ -1,5 +1,5 @@
 /*
- * © Copyright 2021 Josef Schönberger
+ * © Copyright 2024 Josef Schönberger
  *
  * This file is part of my-i3-blocks-snippets.
  *
@@ -19,9 +19,7 @@
 
 #pragma once
 
-/// reads stdin, parses the json data and extracts and returns the button.
-/// 
-/// This function blocks until a whole line could be read. It is recommended to be used after a call to `select`.
-/// @return the button that has been pressed; -1 on error (errno is set appropriately)
-int get_button();
-void button_uninit();
+#include <stdio.h>
+
+int parseButtonFromString(const char* input, FILE* logFile, const char* log_prog_name);
+int readAndParseButton(FILE* logFile, const char* log_prog_name);
