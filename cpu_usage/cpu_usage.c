@@ -1,5 +1,5 @@
 /*
- * © Copyright 2021 Josef Schönberger
+ * © Copyright 2024 Josef Schönberger
  *
  * This file is part of my-i3-blocks-snippets.
  *
@@ -34,7 +34,7 @@
 
 #include "util/log.h"
 #include "util/color.h"
-#include "util/read_button.h"
+#include "util/input_parser.h"
 
 #include "temp.h"
 
@@ -45,7 +45,7 @@ static FILE* logFile;
 
 struct state {
 	unsigned long lastTotal, lastIdle;
-	FILE *stat, *freq;
+	FILE *stat, *freq, *psi;
 	unsigned termLength;
 	double (*term[])();
 };
@@ -107,17 +107,74 @@ int init(struct state* state) {
 		state->freq = NULL;
 	}
 
+	if(!(state->psi = fopen("/proc/pressure/cpu", "r"))) {
+		appendLog(LOG_ERROR, logFile, LOG_PROG_NAME "Could not open /proc/pressure/cpu\n"
+				"\t\tDisabling the pressure warning feature.");
+		state->psi = NULL;
+	}
+	if (state->psi && setvbuf(state->psi, NULL, _IONBF, 0)) {
+		appendLog(LOG_ERROR, logFile, LOG_PROG_NAME
+				"Could not disable buffer for /proc/pressure/cpu.\n"
+				"\t\tDisabling the pressure warning feature.");
+		fclose(state->psi);
+		state->psi = NULL;
+	}
+
 	state->lastTotal = state->lastIdle = 0;
 	return EXIT_SUCCESS;
 }
 
+double getPressure(struct state* state) {
+	if (!state->psi)
+		return 0.0;
+
+	if(fseek(state->psi, 11, SEEK_SET)) {
+		appendLog(LOG_FATAL, logFile, LOG_PROG_NAME "Could not seek in /proc/pressure/cpu");
+		return EXIT_FAILURE;
+	}
+
+	char buf[32];
+	if(!fgets(buf,sizeof(buf),state->psi)) {
+		appendLog(LOG_ERROR, logFile, LOG_PROG_NAME "Could not read /proc/pressure/cpu");
+		return -1;
+	}
+
+	errno = 0;
+	double v = strtod(buf, NULL);
+	if (errno) {
+		static int warn_ctr = 0;
+		warn_ctr++;
+		if (warn_ctr <= 1)
+			appendLogf(LOG_WARN, logFile, LOG_PROG_NAME "PSI some-avg10 is out of range?!?");
+
+		return 0;
+	}
+	return v;
+}
+
 void printUsage(struct state* state) {
+	const char* pressure_string = "";
+
 	double usage = 100 * recalculateLastCPU(state);
 	if(usage == -100)
 		exit(EXIT_FAILURE);
+	if (usage > 80) {
+		double pressure = getPressure(state);
+		if (pressure > 92)
+			pressure_string = " !!!!";
+		if (pressure > 85)
+			pressure_string = " !!!";
+		else if (pressure > 55)
+			pressure_string = " !!";
+		else if (pressure > 30)
+			pressure_string = " !";
+#ifdef DEBUG
+		appendLogf(LOG_INFO, logFile, LOG_PROG_NAME "PSI is %6.2f%%", pressure);
+#endif
+	}
 	char *col = color(usage, 95, 90, 80);
-	printf("{\"name\":\"CPU\", \"full_text\":\"CPU:%5.1f%%\", \"short_text\":\"CPU%3.0f%%\", \"color\":\"%s\"}\n",
-			usage, usage, col);
+	printf("{\"name\":\"CPU\", \"full_text\":\"CPU:%5.1f%%%s\", \"short_text\":\"CPU%3.0f%%%s\", \"color\":\"%s\"}\n",
+			usage, pressure_string, usage, pressure_string, col);
 }
 
 void printTemp(struct state* state) {
@@ -177,7 +234,7 @@ void printFreq(struct state* state) {
 	else
 		color = "#7070FF";
 
-	printf("{\"name\":\"CPU\", \"full_text\":\"%.2f GHz\", \"short_text\":\"%.2f GHz\", \"color\":\"%s\"}\n",
+	printf("{\"name\":\"CPU\", \"full_text\":\"%6.3f GHz\", \"short_text\":\"%.2f GHz\", \"color\":\"%s\"}\n",
 			val, val, color);
 }
 
@@ -200,7 +257,6 @@ int main() {
 
 	initColor(logFile, LOG_PROG_NAME);
 
-	int stdinno = fileno(stdin);
 	fd_set set;
 
 	struct timespec timeout = {2, 0};
@@ -234,8 +290,8 @@ int main() {
 	int type = 1;
 	while(1) {
 		FD_ZERO(&set);
-		FD_SET(stdinno, &set);
-		int val = pselect(stdinno + 1, &set, NULL, NULL, &timeout, NULL);
+		FD_SET(STDIN_FILENO, &set);
+		int val = pselect(STDIN_FILENO + 1, &set, NULL, NULL, &timeout, NULL);
 		if (val == -1) {
 			if(errno == EINTR) {
 				appendLog(LOG_WARN, logFile, LOG_PROG_NAME "Interrupted while selecting");
@@ -250,17 +306,14 @@ int main() {
 			continue;
 		}
 		if (val != 0) { // not caused by timeout
-			int button = get_button();
-			if (button < 0) {
-				appendLogf(errno != EPROTO ? LOG_FATAL : LOG_WARN, logFile, LOG_PROG_NAME "Error determining button: %s%s", strerror(errno), errno != EPROTO ? ". Terminating." : "");
-				if (errno != EPROTO)
-					break;
-			} else if (!button) {
-				appendLog(LOG_FATAL, logFile, LOG_PROG_NAME "Recieved EOF; Terminating.");
+			int button = readAndParseButton(logFile, LOG_PROG_NAME);
+			if (button < -1)
 				break;
-			}
+			else if (button < 0)
+				continue;
+
 #ifdef DEBUG
-			appendLogf(LOG_INFO, logFile, LOG_PROG_NAME "Button %d was pressed", button);
+			appendLogf(LOG_INFO, logFile, LOG_PROG_NAME "Button press: %d", button);
 #endif
 			switch(button) {
 				case 1:
@@ -300,6 +353,5 @@ int main() {
 	if(state.freq) fclose(state.freq);
 	fclose(state.stat);
 	destructTemp();
-	button_uninit();
 	return EXIT_SUCCESS;
 }
