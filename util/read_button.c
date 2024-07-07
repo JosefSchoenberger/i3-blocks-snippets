@@ -28,7 +28,7 @@ static size_t linebuffer_size = 0;
 
 int get_button() {
 	ssize_t n = getline(&line, &linebuffer_size, stdin);
-	if (n == -1 && errno == 0) {
+	if ((n == -1 && errno == 0) || n == 0) {
 		errno = ENODATA;
 		return -1;
 	}
