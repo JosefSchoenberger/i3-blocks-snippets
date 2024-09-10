@@ -3,4 +3,5 @@ build/
 
 cpu_usage.out
 memory_usage.out
+clock.out
 log

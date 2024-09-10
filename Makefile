@@ -22,7 +22,7 @@ OFLAGS ?= -O3
 DIR=./build
 
 .PHONY: all
-all: cpu_usage.out memory_usage.out
+all: cpu_usage.out memory_usage.out clock.out
 
 .PHONY: debug
 debug: all
@@ -39,9 +39,11 @@ cpu_usage.out: $(DIR)/color.out $(DIR)/log.out $(DIR)/input_parser.out cpu_usage
 	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ $^ -lsensors
 memory_usage.out: $(DIR)/color.out $(DIR)/log.out $(DIR)/input_parser.out memory_usage/memory_usage.c
 	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ $^
+clock.out: clock/clock.c
+	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ $^
 
 .PHONY: clean
 .SILENT: clean
 clean:
 	rm -rf build
-	rm -f cpu_usage.out memory_usage.out
+	rm -f cpu_usage.out memory_usage.out clock.out
