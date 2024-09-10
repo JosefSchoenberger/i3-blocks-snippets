@@ -151,6 +151,7 @@ int main(void) {
 	const int countdown_set = 8/(timeout.tv_sec + timeout.tv_nsec*1e-9);
 
 	printUsage();
+	fflush(stdout);
 
 	int countdown=0;
 	int type = 1;
@@ -201,7 +202,7 @@ int main(void) {
 			type = 0;
 
 #ifdef DEBUG
-		ASSERT(type >= 0 && type <= 1);
+		ASSERT(type >= 0 && type <= 3);
 #endif
 		switch(type) {
 			case 0:

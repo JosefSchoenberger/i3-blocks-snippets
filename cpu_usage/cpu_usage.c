@@ -158,7 +158,7 @@ void printUsage(struct state* state) {
 	double usage = 100 * recalculateLastCPU(state);
 	if(usage == -100)
 		exit(EXIT_FAILURE);
-	if (usage > 80) {
+	if (usage >= 50) {
 		double pressure = getPressure(state);
 		if (pressure > 92)
 			pressure_string = " !!!!";
@@ -285,6 +285,9 @@ int main() {
 		return EXIT_FAILURE;
 
 	initTemp(logFile, LOG_PROG_NAME);
+
+	puts("{\"name\":\"CPU\", \"full_text\":\"CPU: --.-%\", \"short_text\":\"CPU --%\", \"color\":\"#FFFFFF\"}");
+	fflush(stdout);
 
 	int countdown=0;
 	int type = 1;
