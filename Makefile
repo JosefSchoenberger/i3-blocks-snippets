@@ -22,7 +22,7 @@ OFLAGS ?= -O3
 DIR=./build
 
 .PHONY: all
-all: cpu_usage.out memory_usage.out clock.out
+all: cpu_usage.out cpu_usage-waybar.out memory_usage.out clock.out clock-waybar.out
 
 .PHONY: debug
 debug: all
@@ -37,13 +37,17 @@ $(DIR)/%.out: util/%.c util/%.h | $(DIR)
 
 cpu_usage.out: $(DIR)/color.out $(DIR)/log.out $(DIR)/input_parser.out cpu_usage/cpu_usage.c cpu_usage/temp.c
 	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ $^ -lsensors
+cpu_usage-waybar.out: $(DIR)/color.out $(DIR)/log.out $(DIR)/input_parser.out cpu_usage/cpu_usage.c cpu_usage/temp.c
+	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ $^ -lsensors -DWAYBAR
 memory_usage.out: $(DIR)/color.out $(DIR)/log.out $(DIR)/input_parser.out memory_usage/memory_usage.c
 	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ $^
 clock.out: clock/clock.c
 	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ $^
+clock-waybar.out: clock/clock.c
+	$(CC) $(WFLAGS) $(OFLAGS) $(IFLAGS) -o $@ $^ -DWAYBAR
 
 .PHONY: clean
 .SILENT: clean
 clean:
 	rm -rf build
-	rm -f cpu_usage.out memory_usage.out clock.out
+	rm -f cpu_usage.out cpu_usage-waybar.out memory_usage.out clock.out clock-waybar.out

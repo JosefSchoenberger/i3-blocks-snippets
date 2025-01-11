@@ -18,6 +18,7 @@
  */
 
 #define _POSIX_C_SOURCE 200809L // for getline
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -173,8 +174,13 @@ void printUsage(struct state* state) {
 #endif
 	}
 	char *col = color(usage, 95, 90, 80);
+#ifndef WAYBAR
 	printf("{\"name\":\"CPU\", \"full_text\":\"CPU:%5.1f%%%s\", \"short_text\":\"CPU%3.0f%%%s\", \"color\":\"%s\"}\n",
 			usage, pressure_string, usage, pressure_string, col);
+#else
+	printf("{\"text\":\"%5.1f%%%s\", \"alt\":\"%5.1f%%%s\", \"color\":\"%s\",\"class\":\"usage\", \"percentage\":%5.1f}\n",
+			usage, pressure_string, usage, pressure_string, col, usage);
+#endif
 }
 
 void printTemp(struct state* state) {
@@ -187,8 +193,13 @@ void printTemp(struct state* state) {
 		exit(EXIT_FAILURE);
 	}
 
+#ifndef WAYBAR
 	printf("{\"name\":\"CPU\", \"full_text\":\"CPU:%3.0f °C\", \"short_text\":\"CPU%3.0f°\", \"color\":\"%s\"}\n",
 			temp, temp, color(temp, 87, 84, 78));
+#else
+	printf("{\"text\":\"%5.1f °C\", \"alt\":\"%3.0f°\", \"color\":\"%s\", \"class\":\"temp\", \"percentage\":%5.1f}\n",
+			temp, temp, color(temp, 87, 84, 78), temp);
+#endif
 }
 
 int error_rep_count = 0;
@@ -234,8 +245,13 @@ void printFreq(struct state* state) {
 	else
 		color = "#7070FF";
 
+#ifndef WAYBAR
 	printf("{\"name\":\"CPU\", \"full_text\":\"%6.3f GHz\", \"short_text\":\"%.2f GHz\", \"color\":\"%s\"}\n",
 			val, val, color);
+#else
+	printf("{\"text\":\"%6.3f GHz\", \"alt\":\"%.2f GHz\", \"color\":\"%s\", \"class\":\"freq\"}\n",
+			val, val, color);
+#endif
 }
 
 void handleSIGINT(int v) {
@@ -243,8 +259,20 @@ void handleSIGINT(int v) {
 	appendLog(LOG_FATAL, logFile, LOG_PROG_NAME "Recieved SIGINT");
 	exit(EXIT_SUCCESS);
 }
+#ifdef WAYBAR
+int sigusrpipe = -1;
+void handleSIGUSR(int v) {
+	appendLogf(LOG_INFO, logFile, LOG_PROG_NAME "Recieved SIGUSR%d", v == SIGUSR1 ? 1 : 2);
+	int button = v == SIGUSR1 ? 1 : 3;
+	if (sigusrpipe >= 0) {
+		ssize_t r = write(sigusrpipe, &button, sizeof(button));
+		if (r < 0)
+			appendLogf(LOG_WARN, logFile, LOG_PROG_NAME "Could not write to pipe: %s", strerror(errno));
+	}
+}
+#endif
 
-int main() {
+int main(void) {
 	logFile = getLog();
 
 	{
@@ -280,21 +308,56 @@ int main() {
 
 	const int countdown_set = 8/(timeout.tv_sec + timeout.tv_nsec*1e-9);
 
+#ifdef WAYBAR
+	int sigusrpipefds[2];
+	int r = pipe(sigusrpipefds);
+	if (r < 0) {
+		appendLogf(LOG_WARN, logFile, LOG_PROG_NAME "Could not open pipe for signal handling: %s", strerror(errno));
+		sigusrpipefds[0] = sigusrpipefds[1] = sigusrpipe = -1;
+	} else {
+		sigusrpipe = sigusrpipefds[1];
+	}
+
+	{
+		struct sigaction act;
+		act.sa_handler = handleSIGUSR;
+		act.sa_flags = 0;
+		sigemptyset(&act.sa_mask);
+		sigaction(SIGUSR1, &act, NULL);
+		sigaction(SIGUSR2, &act, NULL);
+	}
+#endif
+
 	struct state state;
 	if(init(&state) == EXIT_FAILURE)
 		return EXIT_FAILURE;
 
 	initTemp(logFile, LOG_PROG_NAME);
 
+#ifndef WAYBAR
 	puts("{\"name\":\"CPU\", \"full_text\":\"CPU: --.-%\", \"short_text\":\"CPU --%\", \"color\":\"#FFFFFF\"}");
+#else
+	puts("{\"text\":\"--.-%\", \"alt\":\"--%\", \"percentage\":0}\n");
+#endif
 	fflush(stdout);
 
 	int countdown=0;
 	int type = 1;
+	bool consider_stdin = true;
 	while(1) {
 		FD_ZERO(&set);
-		FD_SET(STDIN_FILENO, &set);
-		int val = pselect(STDIN_FILENO + 1, &set, NULL, NULL, &timeout, NULL);
+		int maxfd = STDIN_FILENO;
+#ifdef WAYBAR
+		if (sigusrpipefds[1] >= 0) {
+			FD_SET(sigusrpipefds[0], &set);
+			if (maxfd < sigusrpipefds[0])
+				maxfd = sigusrpipefds[0];
+		}
+#endif
+		if (consider_stdin) {
+			FD_SET(STDIN_FILENO, &set);
+		}
+		int val = pselect(maxfd + 1, &set, NULL, NULL, &timeout, NULL);
 		if (val == -1) {
 			if(errno == EINTR) {
 				appendLog(LOG_WARN, logFile, LOG_PROG_NAME "Interrupted while selecting");
@@ -309,7 +372,30 @@ int main() {
 			continue;
 		}
 		if (val != 0) { // not caused by timeout
-			int button = readAndParseButton(logFile, LOG_PROG_NAME);
+			int button;
+#ifdef WAYBAR
+			if (sigusrpipefds[0] >= 0 && FD_ISSET(sigusrpipefds[0], &set)) {
+				ssize_t r = read(sigusrpipefds[0], &button, sizeof(button));
+				if (r < 0) {
+					appendLogf(LOG_WARN, logFile, LOG_PROG_NAME "Could not read from signal pipe: %s", strerror(errno));
+					continue;
+				}
+				if (r != sizeof(button)) {
+					appendLogf(LOG_WARN, logFile, LOG_PROG_NAME "read from signal pipe did not return %zd, but %zd", sizeof(button), r);
+					continue;
+				}
+				appendLogf(LOG_INFO, logFile, LOG_PROG_NAME "button %d was pressed using SIGUSR", button);
+			} else {
+#endif
+			button = readAndParseButton(logFile, LOG_PROG_NAME);
+#ifdef WAYBAR
+				if (button == -2) {
+					consider_stdin = false;
+					appendLog(LOG_INFO, logFile, LOG_PROG_NAME "...or not");
+					continue;
+				}
+			}
+#endif
 			if (button < -1)
 				break;
 			else if (button < 0)

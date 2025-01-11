@@ -3,7 +3,11 @@
 
 void format_time(char buf[256], const time_t time) {
 	const struct tm* const t = localtime(&time);
-	strftime(buf, 256, "{\"name\":\"Clock\", \"full_text\":\"%a, %d. %b %Y %T\", \"short_text\":\"%a, %d.%m.%y %T\", \"color\":\"#FFFFFF\"}", t);
+#ifdef WAYBAR
+	strftime(buf, 256, "{\"text\":\"%a, %d. %b %Y %T\", \"alt\":\"%a, %d.%m.%y %T\"}", t);
+#else
+	strftime(buf, 256, "{\"name\":\"Clock\", \"full_text\":\"%a, %d. %b %Y  %T\", \"short_text\":\"%a, %d.%m.%y %T\", \"color\":\"#FFFFFF\"}", t);
+#endif
 }
 
 int main(void) {
