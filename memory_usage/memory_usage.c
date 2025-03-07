@@ -97,12 +97,22 @@ static void printUsage(void) {
 	}
 	buffer[r] = '\0';
 
-	unsigned long total = valueForMeminfoType(buffer, "MemTotal:");
-	unsigned long avail = valueForMeminfoType(buffer, "MemAvailable:");
-	unsigned long cached = valueForMeminfoType(buffer, "Cached:");
-	cached += valueForMeminfoType(buffer, "SwapCached:");
-	cached += valueForMeminfoType(buffer, "Buffers:");
-	double percentage = (total - avail - cached)*100.0/total;
+	// See https://github.com/htop-dev/htop/6de810fa55936ad2ab8ae86db6b5f8b6d97a26c2/linux/LinuxMachine.c#L200
+
+	long total = valueForMeminfoType(buffer, "MemTotal:");
+	//long avail = valueForMeminfoType(buffer, "MemAvailable:");
+	long free = valueForMeminfoType(buffer, "MemFree:");
+	long cached = valueForMeminfoType(buffer, "Cached:");
+	long sreclaimable = valueForMeminfoType(buffer, "SReclaimable:");
+	long shared = valueForMeminfoType(buffer, "Shmem:");
+	long buffers = valueForMeminfoType(buffer, "Buffers:");
+
+	cached += sreclaimable - shared;
+
+	long usedDiff = free + cached + sreclaimable + buffers;
+	double percentage = (total >= usedDiff) ? total - usedDiff : total - free;
+	percentage *= 100;
+	percentage /= total;
 	printValue("RAM", percentage, "%", color(percentage, 95.0, 90.0, 85.0));
 }
 static void printUsageWithCache(void) {
