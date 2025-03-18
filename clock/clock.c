@@ -27,6 +27,9 @@ int main(void) {
 		format_time(buf, time.tv_sec);
 		puts(buf);
 		fflush(stdout);
+
+		if (ferror(stdout)) // likely EPIPE -> bar is dead. Terminate.
+			break;
 		//printf("%ld\n", time.tv_nsec);
 	}
 }

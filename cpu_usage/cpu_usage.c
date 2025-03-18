@@ -262,6 +262,10 @@ void handleSIGINT(int v) {
 #ifdef WAYBAR
 int sigusrpipe = -1;
 void handleSIGUSR(int v) {
+	if (v == SIGPIPE) {
+		appendLogf(LOG_INFO, logFile, LOG_PROG_NAME "Recieved SIGPIPE -- assuming bar died. Terminating.");
+		close(sigusrpipe);
+	}
 	appendLogf(LOG_INFO, logFile, LOG_PROG_NAME "Recieved SIGUSR%d", v == SIGUSR1 ? 1 : 2);
 	int button = v == SIGUSR1 ? 1 : 3;
 	if (sigusrpipe >= 0) {
@@ -325,6 +329,7 @@ int main(void) {
 		sigemptyset(&act.sa_mask);
 		sigaction(SIGUSR1, &act, NULL);
 		sigaction(SIGUSR2, &act, NULL);
+		sigaction(SIGPIPE, &act, NULL);
 	}
 #endif
 
@@ -379,6 +384,9 @@ int main(void) {
 				if (r < 0) {
 					appendLogf(LOG_WARN, logFile, LOG_PROG_NAME "Could not read from signal pipe: %s", strerror(errno));
 					continue;
+				}
+				if (r == 0) {
+					break;
 				}
 				if (r != sizeof(button)) {
 					appendLogf(LOG_WARN, logFile, LOG_PROG_NAME "read from signal pipe did not return %zd, but %zd", sizeof(button), r);

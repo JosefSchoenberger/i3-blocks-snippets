@@ -226,6 +226,8 @@ int main(void) {
 				break;
 		}
 		fflush(stdout);
+		if (ferror(stdout)) // likely EPIPE -> bar is dead. Terminate.
+			break;
 	}
 	if(logFile) fclose(logFile);
 	return EXIT_SUCCESS;
