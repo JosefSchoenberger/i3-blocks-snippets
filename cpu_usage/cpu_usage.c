@@ -52,6 +52,11 @@ struct state {
 };
 
 double recalculateLastCPU(struct state* state) {
+	if(fseek(state->stat, +5, SEEK_SET)) {
+		appendLog(LOG_FATAL, logFile, LOG_PROG_NAME "Could not seek in /proc/stat");
+		return EXIT_FAILURE;
+	}
+
 	char buf[192];
 	if(!fgets(buf,sizeof(buf),state->stat)) {
 		appendLog(LOG_ERROR, logFile, LOG_PROG_NAME "Could not read /proc/stat");
@@ -67,10 +72,6 @@ double recalculateLastCPU(struct state* state) {
 			if (i++ == 3)
 				newIdle = val;
 		}
-	}
-	if(fseek(state->stat, +5, SEEK_SET)) {
-		appendLog(LOG_FATAL, logFile, LOG_PROG_NAME "Could not seek in /proc/stat");
-		return EXIT_FAILURE;
 	}
 
 	double result = 1 - (newIdle - state->lastIdle)/(double)(newTotal - state->lastTotal);
