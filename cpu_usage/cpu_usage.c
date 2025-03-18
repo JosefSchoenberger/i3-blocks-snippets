@@ -343,7 +343,7 @@ int main(void) {
 #ifndef WAYBAR
 	puts("{\"name\":\"CPU\", \"full_text\":\"CPU: --.-%\", \"short_text\":\"CPU --%\", \"color\":\"#FFFFFF\"}");
 #else
-	puts("{\"text\":\"--.-%\", \"alt\":\"--%\", \"percentage\":0}\n");
+	puts("{\"text\":\"--.-%\", \"alt\":\"--%\", \"percentage\":0}");
 #endif
 	fflush(stdout);
 
